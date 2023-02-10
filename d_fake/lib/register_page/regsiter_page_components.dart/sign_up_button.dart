@@ -1,0 +1,73 @@
+import 'package:d_fake/register_page/register_page_controller.dart';
+import 'package:d_fake/services/custom_toast.dart';
+import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:get/get.dart';
+import 'package:lottie/lottie.dart';
+
+class SignUpButton extends StatelessWidget {
+  final registerPageController = Get.put(RegisterPageController());
+  SignUpButton(
+      {Key? key,
+      required this.sigUpFormState,
+      required this.emailController,
+      required this.passwordController,
+      required this.firstNameController,
+      required this.lastNameController,
+      required this.userNumberController,
+      required this.userCredintial})
+      : super(key: key);
+
+  final GlobalKey<FormState> sigUpFormState;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final TextEditingController firstNameController;
+  final TextEditingController lastNameController;
+  final TextEditingController userNumberController;
+  final String userCredintial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: ElevatedButton(
+        style: ButtonStyle(
+            backgroundColor: MaterialStateProperty.all<Color>(Colors.green)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text("Register now"),
+            SizedBox(
+              width: 10,
+            ),
+            FaIcon(
+              FontAwesomeIcons.arrowRight,
+              size: 16,
+            )
+          ],
+        ),
+        onPressed: () async {
+          if (sigUpFormState.currentState!.validate() && userCredintial != "") {
+            try {
+              await registerPageController.registerNewUser(
+                  userCategory: userCredintial,
+                  context: context,
+                  emailController: emailController,
+                  passwordController: passwordController,
+                  firstNameController: firstNameController,
+                  lastNameController: lastNameController,
+                  userNumberController: userNumberController);
+            } catch (e) {
+              CustomToast.showRedToast(messsage: e.toString());
+            }
+          } else {
+            CustomToast.showBlackToast(
+                messsage:
+                    "user credintial = ${registerPageController.userCredintial}");
+            CustomToast.showRedToast(messsage: "error in validation");
+          }
+        },
+      ),
+    );
+  }
+}
