@@ -1,9 +1,13 @@
+import 'dart:convert';
+import 'dart:ffi';
+import 'dart:io';
 import 'package:d_fake/config/dimensions.dart';
 import 'package:d_fake/config/user_data_model/user_data_model.dart';
 import 'package:d_fake/login_screen/login_screen.dart';
 import 'package:d_fake/main_page_components.dart';
 import 'package:d_fake/services/Shared_preferences/shared_preferences_class.dart';
 import 'package:d_fake/services/custom_toast.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:d_fake/splach_screen/splach_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -11,6 +15,7 @@ import 'package:get/get.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +50,8 @@ class _MainPageState extends State<MainPage> {
   ImagePicker picker = ImagePicker();
   late XFile? image;
   bool userGettedImage = false;
+
+  final _firebaseStorage = FirebaseStorage.instance;
 
   @override
   Widget build(BuildContext context) {
@@ -112,8 +119,27 @@ class _MainPageState extends State<MainPage> {
                 ),
                 GestureDetector(
                   onTap: () async {
+                    showLoaderDialog(context, "Loading......");
                     // CustomToast.showRedToast(messsage: 'get image');
                     image = await picker.pickImage(source: ImageSource.gallery);
+                    if (image != null) {
+                      String url = await uploadImageToFirebase(image!);
+                      String imageName = url.split('%2')[1].split('?')[0];
+                      List<String> parameters = url.split('?')[1].split("=");
+                      String alt = parameters[1].split('&')[0];
+                      String token = parameters[2];
+                      var response =
+                          await processImageInAPI(imageName, alt, token);
+                      print(response);
+                      if(response != null){
+                        double score = double.parse(response["Score"]);
+                        CustomToast.showGreenToast(messsage: score > 0.1 ? "Fake Image: $score" : "Real Image: $score");
+                      }
+                    } else {
+                      CustomToast.showRedToast(
+                          messsage: "Please Select an Image");
+                    }
+                    Navigator.pop(context);
                   },
                   child: ImagePickerContainer(),
                 ),
@@ -158,6 +184,48 @@ class _MainPageState extends State<MainPage> {
               ],
             ),
           )),
+    );
+  }
+
+  Future<String> uploadImageToFirebase(XFile imageToUpload) async {
+    var file = File(imageToUpload.path);
+    String imageName = imageToUpload.name;
+    var snapshot = await _firebaseStorage
+        .ref()
+        .child('images')
+        .child(imageName)
+        .putFile(file);
+    String downloadUrl = await snapshot.ref.getDownloadURL();
+    return downloadUrl;
+  }
+
+  Future processImageInAPI(String imageName, String alt, String token) async {
+    var url = Uri.parse(
+        "http://localhost:5000/image/$imageName?alt=$alt&token=$token");
+    try {
+      var res = await http.get(url);
+      return json.decode(res.body);
+    } catch (e) {
+      CustomToast.showRedToast(messsage: "An Error has occurred! Please try again");
+      return null;
+    }
+  }
+
+  showLoaderDialog(BuildContext context, String msg) {
+    AlertDialog alert = AlertDialog(
+      content: Row(
+        children: [
+          CircularProgressIndicator(),
+          Container(margin: const EdgeInsets.only(left: 7), child: Text(msg)),
+        ],
+      ),
+    );
+    showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext context) {
+        return alert;
+      },
     );
   }
 }
